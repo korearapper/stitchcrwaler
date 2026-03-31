@@ -50,7 +50,7 @@ async function checkShoppingRank(keyword, mid){
 async function checkPlaceRank(keyword, shopName){
   const targetName=shopName.trim().toLowerCase().replace(/\s/g,'');
   console.log(`[플레이스] "${keyword}" / 업체: "${shopName}"`);
-  for(let start=1;start<=25;start+=5){
+  for(let start=1;start<=300;start+=5){
     const data=await searchLocal(keyword,start,5);
     if(!data||!data.items||!data.items.length){break}
     console.log(`  start=${start}: ${data.items.length}개`);
@@ -65,7 +65,7 @@ async function checkPlaceRank(keyword, shopName){
     }
     await wait(200);
   }
-  console.log('  25위내 없음');
+  console.log('  300위내 없음');
   return{rank:null};
 }
 

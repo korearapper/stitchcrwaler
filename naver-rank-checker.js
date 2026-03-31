@@ -262,7 +262,7 @@ async function checkRank(keyword, mid, type='both'){
     if(type==='price'||type==='both'){
       console.log('--- 가격비교 ---');
       let r = await checkRankAPI(page, keyword, mid, 'total');
-      if(r.rank===null && !r.error?.includes('HTTP')){
+      if(r.rank===null){
         console.log('[가격비교] API 실패 → DOM fallback');
         r = await checkRankDOM(page, keyword, mid, 'total');
         r.method='dom';
@@ -275,7 +275,7 @@ async function checkRank(keyword, mid, type='both'){
       await wait(rnd(2000,4000));
       console.log('--- 플러스스토어 ---');
       let r = await checkRankAPI(page, keyword, mid, 'smartstore');
-      if(r.rank===null && !r.error?.includes('HTTP')){
+      if(r.rank===null){
         console.log('[플러스스토어] API 실패 → DOM fallback');
         r = await checkRankDOM(page, keyword, mid, 'smartstore');
         r.method='dom';

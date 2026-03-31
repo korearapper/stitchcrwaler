@@ -1,15 +1,8 @@
 {
-  "name": "naver-rank-checker",
+  "name": "stitch-rank-checker",
   "version": "1.0.0",
-  "description": "네이버 쇼핑 순위 조회 API (Playwright)",
   "main": "naver-rank-checker.js",
-  "scripts": {
-    "start": "node naver-rank-checker.js --server",
-    "check": "node naver-rank-checker.js"
-  },
-  "dependencies": {
-    "playwright": "^1.49.0",
-    "express": "^4.21.0",
-    "cors": "^2.8.5"
-  }
+  "scripts": { "start": "node naver-rank-checker.js" },
+  "dependencies": { "express": "^4.21.0", "cors": "^2.8.5" },
+  "engines": { "node": ">=18.0.0" }
 }

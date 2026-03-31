@@ -189,6 +189,18 @@ async function checkRankDOM(page, keyword, mid, productSet){
   await page.goto(searchUrl, {waitUntil:'networkidle', timeout:20000});
   await wait(rnd(2000,3500));
 
+  // 페이지 상태 확인
+  const pageTitle = await page.title();
+  const pageUrl = page.url();
+  console.log(`[DOM/${productSet}] 페이지: ${pageTitle} | ${pageUrl}`);
+
+  // 캡챠 감지
+  const bodyText = await page.evaluate(()=>document.body.innerText.substring(0,300));
+  if(bodyText.includes('자동입력방지')||bodyText.includes('captcha')||bodyText.includes('비정상')){
+    console.log(`[DOM/${productSet}] ⚠️ 캡챠 감지됨!`);
+    return {rank:null, error:'captcha'};
+  }
+
   let globalRank=0;
   for(let pg=1;pg<=Math.min(PAGES,5);pg++){
     // 스크롤 다운
@@ -197,11 +209,12 @@ async function checkRankDOM(page, keyword, mid, productSet){
       await wait(rnd(200,500));
     }
 
-    const found = await page.evaluate((tid)=>{
+    const found = await page.evaluate(()=>{
       const results=[];
-      const sels=['[class*="product_item"]','[class*="basicList_item"]','[data-shp-contents-type]','[data-nclick]'];
+      const sels=['[class*="product_item"]','[class*="basicList_item"]','[data-shp-contents-type]','[data-nclick]','li[class*="item"]','div[class*="item"]'];
       let els=[];
-      for(const s of sels){els=document.querySelectorAll(s);if(els.length>0)break}
+      let usedSel='';
+      for(const s of sels){els=document.querySelectorAll(s);if(els.length>0){usedSel=s;break}}
 
       for(let i=0;i<els.length;i++){
         const el=els[i];
@@ -209,7 +222,6 @@ async function checkRankDOM(page, keyword, mid, productSet){
         const links=Array.from(el.querySelectorAll('a[href]')).map(a=>a.href).join(' ');
         const mids=[];
 
-        // 다양한 패턴
         const m1=links.match(/\/catalog\/(\d+)/);if(m1)mids.push(m1[1]);
         const m2=links.match(/[?&]nvMid=(\d+)/);if(m2)mids.push(m2[1]);
         const m3=links.match(/[?&]nv_mid=(\d+)/);if(m3)mids.push(m3[1]);
@@ -217,15 +229,30 @@ async function checkRankDOM(page, keyword, mid, productSet){
         const m5=el.getAttribute('data-shp-contents-id');if(m5)mids.push(m5);
         const m6=html.match(/productId["\s:=]+["]*(\d{8,})/);if(m6)mids.push(m6[1]);
         const m7=links.match(/products\/(\d+)/);if(m7)mids.push(m7[1]);
-        // nvMid in HTML
         const m8=html.match(/nvMid["\s:=]+["]*(\d{8,})/);if(m8)mids.push(m8[1]);
+        // 추가: 모든 숫자ID 패턴
+        const m9=html.match(/["'](\d{9,})['"]/g);
+        if(m9)m9.forEach(x=>{const n=x.replace(/['"]/g,'');if(n.length>=9)mids.push(n)});
 
         results.push({idx:i,mids:[...new Set(mids)]});
       }
-      return results;
-    }, target);
+      return {usedSel, count:els.length, items:results};
+    });
 
-    for(const item of found){
+    console.log(`[DOM/${productSet}] pg${pg}: 셀렉터="${found.usedSel}" 상품=${found.count}개`);
+    if(found.count>0 && pg===1){
+      // 처음 3개 상품 MID 로그
+      found.items.slice(0,3).forEach((it,i)=>{
+        console.log(`  상품${i+1} MIDs: [${it.mids.join(', ')}]`);
+      });
+    }
+
+    if(!found.count){
+      console.log(`[DOM/${productSet}] 상품 요소 없음. body: ${bodyText.substring(0,100)}`);
+      break;
+    }
+
+    for(const item of found.items){
       globalRank++;
       for(const m of item.mids){
         if(norm(m)===target||m.includes(target)){
@@ -239,7 +266,7 @@ async function checkRankDOM(page, keyword, mid, productSet){
     if(pg<5){
       const next=await page.$('a[class*="next"]')||await page.$(`button:has-text("${pg+1}")`);
       if(next){await next.click();await wait(rnd(2000,3500));globalRank=pg*PP}
-      else break;
+      else{console.log(`[DOM/${productSet}] 다음페이지 버튼 없음`);break}
     }
   }
   console.log(`[DOM/${productSet}] 찾지 못함`);
@@ -321,6 +348,35 @@ app.get('/debug',async(req,res)=>{
     });
     await page.close();
     res.json({keyword,keys:Object.keys(data),count:items.length,products:summary});
+  }catch(e){res.status(500).json({error:e.message})}
+});
+
+// 스크린샷 디버그 — 실제 브라우저가 뭘 보고 있는지 확인
+app.get('/screenshot',async(req,res)=>{
+  const{keyword}=req.query;
+  if(!keyword)return res.status(400).json({error:'keyword 필수'});
+  try{
+    const{context}=await getBrowser();
+    const page=await context.newPage();
+    const url='https://search.shopping.naver.com/search/all?query='+encodeURIComponent(keyword);
+    await page.goto(url,{waitUntil:'networkidle',timeout:20000});
+    await wait(3000);
+    // 스크롤
+    for(let i=0;i<3;i++){await page.evaluate(()=>window.scrollBy(0,window.innerHeight));await wait(500)}
+    const screenshot=await page.screenshot({fullPage:false,type:'png'});
+    const pageTitle=await page.title();
+    const pageUrl=page.url();
+    const bodyText=await page.evaluate(()=>document.body.innerText.substring(0,500));
+    // 상품 요소 개수 확인
+    const elemCount=await page.evaluate(()=>{
+      const sels=['[class*="product_item"]','[class*="basicList_item"]','[data-shp-contents-type]','[data-nclick]','li.product'];
+      const r={};
+      for(const s of sels){r[s]=document.querySelectorAll(s).length}
+      return r;
+    });
+    await page.close();
+    // base64 이미지로 반환
+    res.json({pageTitle,pageUrl,bodyPreview:bodyText,elementCounts:elemCount,screenshot:'data:image/png;base64,'+screenshot.toString('base64')});
   }catch(e){res.status(500).json({error:e.message})}
 });
 

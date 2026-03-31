@@ -1,12 +1,8 @@
 {
   "name": "stitch-rank-checker",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "main": "naver-rank-checker.js",
   "scripts": { "start": "node naver-rank-checker.js" },
-  "dependencies": {
-    "express": "^4.21.0",
-    "cors": "^2.8.5",
-    "playwright": "^1.49.0"
-  },
+  "dependencies": { "express": "^4.21.0", "cors": "^2.8.5" },
   "engines": { "node": ">=18.0.0" }
 }
